@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日のひとこと ランダム ワードスピナー</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0c1426; color: #f0f4ff; font-family: 'Segoe UI', sans-serif; }
+  @keyframes spinIn { from{opacity:0;transform:rotateX(90deg) scale(0.8)} to{opacity:1;transform:rotateX(0) scale(1)} }
+  .spin-in { animation: spinIn 0.5s ease-out; }
+  @keyframes heartBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
+  .heart-beat { animation: heartBeat 0.3s ease; }
+  input[type=range] { accent-color: #3b82f6; }
+  ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-thumb { background:#1e3a5f; border-radius:3px }
+</style>
+</head>
+<body class="min-h-screen p-4">
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-2xl font-bold text-blue-300 mb-1">📖 今日のひとこと ワードスピナー</h1>
+  <p class="text-gray-400 text-sm mb-5">毎日1単語をランダム提示。語源・類義語・例文付き。お気に入り保存・30日チャレンジ。</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <!-- メインカード -->
+    <div class="md:col-span-2">
+      <!-- 今日の単語 -->
+      <div id="word-card" class="bg-gradient-to-br from-blue-900 to-indigo-900 rounded-2xl p-6 mb-4 border border-blue-700 relative">
+        <div class="absolute top-3 right-3 flex gap-2">
+          <span id="word-type-badge" class="text-xs bg-blue-800 text-blue-200 px-2 py-1 rounded-full"></span>
+          <button id="fav-btn" onclick="toggleFavorite()" class="text-2xl transition-transform" aria-label="お気に入りに追加">🤍</button>
+        </div>
+        <div id="word-display" class="text-5xl font-bold text-white mb-2 spin-in">──</div>
+        <div id="reading-display" class="text-gray-300 text-lg mb-1"></div>
+        <div id="meaning-display" class="text-gray-200 text-base mb-4 leading-relaxed"></div>
+
+        <div class="space-y-3 text-sm">
+          <div class="bg-black bg-opacity-30 rounded-lg p-3">
+            <span class="text-blue-300 font-semibold">語源: </span>
+            <span id="etymology-display" class="text-gray-300"></span>
+          </div>
+          <div class="bg-black bg-opacity-30 rounded-lg p-3">
+            <span class="text-green-300 font-semibold">例文: </span>
+            <span id="example-display" class="text-gray-200 italic"></span>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <div class="bg-black bg-opacity-30 rounded-lg p-3 flex-1 min-w-0">
+              <div class="text-yellow-300 font-semibold text-xs mb-1">類義語</div>
+              <div id="syn-display" class="text-gray-300 text-xs"></div>
+            </div>
+            <div class="bg-black bg-opacity-30 rounded-lg p-3 flex-1 min-w-0">
+              <div class="text-red-300 font-semibold text-xs mb-1">反義語</div>
+              <div id="ant-display" class="text-gray-300 text-xs"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mb-5">
+        <button onclick="showTodayWord()" class="flex-1 bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 rounded-xl transition-colors" aria-label="今日のひとことを表示">📅 今日のひとこと</button>
+        <button onclick="showRandomWord()" class="flex-1 bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-2 rounded-xl transition-colors" aria-label="別の単語を引く">🎲 別の単語を引く</button>
+      </div>
+
+      <!-- お気に入りリスト -->
+      <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <h2 class="text-base font-semibold text-blue-200 mb-3">❤️ お気に入りリスト（<span id="fav-count">0</span>件）</h2>
+        <div id="fav-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+        <div id="fav-empty" class="text-gray-500 text-sm">ハートボタンでお気に入りに追加できます</div>
+      </div>
+    </div>
+
+    <!-- サイドバー: チャレンジ -->
+    <div class="space-y-4">
+      <!-- 30日チャレンジ -->
+      <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <h2 class="text-base font-semibold text-green-300 mb-3">🔥 30日チャレンジ</h2>
+        <div class="text-center mb-4">
+          <div id="streak-count" class="text-5xl font-bold text-orange-400">0</div>
+          <div class="text-gray-400 text-sm">日連続</div>
+          <div class="text-xs text-gray-500 mt-1" id="streak-max">最大 0 日</div>
+        </div>
+
+        <!-- カレンダー -->
+        <div id="streak-calendar" class="grid grid-cols-7 gap-1 mb-3"></div>
+        <div class="text-xs text-gray-500 text-center">今月の記録カレンダー</div>
+
+        <button onclick="markToday()" class="mt-3 w-full bg-green-700 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold" aria-label="今日の確認を記録する">✅ 今日確認した！</button>
+        <div id="streak-msg" class="text-xs text-gray-400 mt-2 text-center"></div>
+      </div>
+
+      <!-- カテゴリ別統計 -->
+      <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">カテゴリ別</h2>
+        <div id="cat-stats" class="space-y-1 text-xs"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORDS = [
+  {w:'慧眼',r:'けいがん',cat:'漢語',mean:'物事の本質をするどく見抜く能力',ety:'慧=賢い+眼=目。中国語由来の二字熟語',ex:'彼女の慧眼は、長年の経験から磨かれた宝だ。',syn:'洞察力・先見性・炯眼',ant:'近視眼・無頓着'},
+  {w:'憧憬',r:'しょうけい・どうけい',cat:'漢語',mean:'遠い理想や人に対して強く心が引かれること',ety:'憧=あこがれる+憬=悟る。あこがれの気持ち',ex:'子供の頃から宇宙への憧憬を抱いていた。',syn:'憧れ・羨望・渇望',ant:'嫌悪・無関心'},
+  {w:'刹那',r:'せつな',cat:'漢語',mean:'きわめて短い時間・瞬間',ety:'サンスクリット語「kṣaṇa」の音訳。仏教用語',ex:'刹那の判断が試合の行方を決めた。',syn:'瞬間・一瞬・片時',ant:'永遠・永劫'},
+  {w:'逡巡',r:'しゅんじゅん',cat:'漢語',mean:'ためらって決断できないこと',ety:'逡=しりごむ+巡=めぐる。後ずさりしながら迷うイメージ',ex:'彼は長い逡巡の末、転職を決意した。',syn:'躊躇・ためらい・迷い',ant:'決断・即断・断行'},
+  {w:'閑話休題',r:'かんわきゅうだい',cat:'四字熟語',mean:'それはさておき・話を本題に戻すときの接続語',ety:'閑話=余談+休題=話を止める。文章上の転換表現',ex:'閑話休題、本日のメインテーマに移ります。',syn:'それはさておき・話を変えて',ant:'つまり・すなわち'},
+  {w:'杞憂',r:'きゆう',cat:'四字熟語',mean:'取り越し苦労・必要のない心配',ety:'古代中国の杞の国の人が天が落ちてくると心配した故事',ex:'飛行機の墜落を心配するのは杞憂に過ぎない。',syn:'取り越し苦労・無用の心配',ant:'楽観・泰然自若'},
+  {w:'朝三暮四',r:'ちょうさんぼし',cat:'四字熟語',mean:'目先の違いにこだわって本質を見ない・言葉巧みに人を欺くこと',ety:'猿にトチの実を朝3暮4にするか朝4暮3にするかで怒ったり喜んだりする故事',ex:'プランAもBも総量は同じ。朝三暮四に惑わされるな。',syn:'場当たり・先見の明がない',ant:'大局観・長期的視野'},
+  {w:'付和雷同',r:'ふわらいどう',cat:'四字熟語',mean:'自分の考えなしに他人の意見に安易に同調すること',ety:'付和=つき従う+雷同=雷のようについ同調する',ex:'付和雷同せず自分の意見を持つことが大切だ。',syn:'右に倣え・追随・迎合',ant:'独立自尊・自主独立'},
+  {w:'あわい',r:'あわい',cat:'和語',mean:'二つのものの間・狭間・隙間。また物事の微妙な境目',ety:'「間（あひ）」が変化。古語では「あわひ」',ex:'生と死のあわいに漂うような静寂だった。',syn:'狭間・境目・はざま',ant:'中心・核心'},
+  {w:'まろやか',r:'まろやか',cat:'和語',mean:'角がなく丸みがあること。味・音などが柔らかく穏やかなこと',ety:'「丸（まろ）」+形容動詞語尾「やか」',ex:'このウイスキーはまろやかな甘みが特徴です。',syn:'柔らか・まったり・穏やか',ant:'辛口・尖った・荒い'},
+  {w:'たおやか',r:'たおやか',cat:'和語',mean:'しなやかで優美なさま・物腰が柔らかく上品なさま',ety:'「たゆ（撓）」から派生。しなる・しなやか',ex:'たおやかな舞いで観客を魅了した。',syn:'しなやか・優美・優雅',ant:'剛直・無骨・荒々しい'},
+  {w:'うつろ',r:'うつろ',cat:'和語',mean:'中が空洞のさま。また心や目の焦点が定まらないさま',ety:'「うつ（空）」から派生。中が空であること',ex:'彼はうつろな目で窓の外を見続けていた。',syn:'虚ろ・空虚・ぼんやり',ant:'生き生き・輝く・充実'},
+  {w:'かそけし',r:'かそけし',cat:'和語',mean:'かすかで消え入りそうなさま',ety:'古語。「かそく（幽く）」の語幹から。万葉集にも登場',ex:'かそけき灯火が暗闇を照らしていた。',syn:'かすか・幽か・ほのか',ant:'鮮明・明確・際立つ'},
+  {w:'マリアージュ',r:'まりあーじゅ',cat:'外来語',mean:'フランス語で「結婚・組み合わせ」。食べ物と飲み物の相性',ety:'仏語mariage=結婚。ワインと料理の組み合わせから転用',ex:'チーズとワインのマリアージュを楽しむ。',syn:'組み合わせ・相性・ペアリング',ant:'ミスマッチ・不相性'},
+  {w:'レジリエンス',r:'れじりえんす',cat:'外来語',mean:'困難・逆境から回復する力・精神的強靭さ',ety:'ラテン語resilio=跳ね返る。英語resilience',ex:'高いレジリエンスを持つ組織は危機に強い。',syn:'回復力・強靭性・耐性',ant:'脆弱性・もろさ'},
+  {w:'エピファニー',r:'えぴふぁにー',cat:'外来語',mean:'突然の気づき・啓示・本質の閃き',ety:'ギリシャ語epiphaneia=顕現。宗教用語から転用',ex:'長い思考の末、エピファニーが訪れた。',syn:'ひらめき・啓示・開眼',ant:'混沌・無知・暗中模索'},
+  {w:'シュールストレミング',r:'しゅーるすとれみんぐ',cat:'外来語',mean:'スウェーデンの発酵ニシン缶詰。世界最臭の食べ物の一つ',ety:'スウェーデン語surströmming=サワーバルト海ニシン',ex:'シュールストレミングは屋外でのみ開封が推奨される。',syn:'発酵食品・珍味',ant:'芳醇・爽やか'},
+  {w:'一期一会',r:'いちごいちえ',cat:'四字熟語',mean:'一生に一度の出会い。その出会いを大切にすること',ety:'茶道の心得。千利休の弟子・山上宗二の記録に登場',ex:'旅先での出会いは一期一会。大切にしたい。',syn:'袖振り合うも多生の縁・縁起',ant:'軽率・二度とない機会の無駄遣い'},
+  {w:'温故知新',r:'おんこちしん',cat:'四字熟語',mean:'古いものを研究し新しい知識・見解を得ること',ety:'論語の「故きを温めて新しきを知る」より',ex:'温故知新の精神で伝統と革新を融合させた。',syn:'古典回帰・歴史から学ぶ',ant:'無知・過去の否定'},
+  {w:'明鏡止水',r:'めいきょうしすい',cat:'四字熟語',mean:'心が静かに落ち着き、何の曇りもない状態',ety:'明鏡=曇りのない鏡+止水=静止した水面。禅の境地',ex:'明鏡止水の境地で難局に臨んだ。',syn:'無我の境地・平静・泰然',ant:'動揺・混乱・浮き足立つ'},
+  {w:'阿吽の呼吸',r:'あうんのこきゅう',cat:'漢語',mean:'二人がぴったり息が合うこと',ety:'阿吽は口を開いた音と閉じた音。仁王像の対に由来',ex:'二人は阿吽の呼吸でプレーを合わせた。',syn:'以心伝心・息が合う・ツーカー',ant:'すれ違い・意思疎通不足'},
+  {w:'魑魅魍魎',r:'ちみもうりょう',cat:'漢語',mean:'山野・川などに住む化け物たち。悪人・得体の知れないもの',ety:'魑・魅・魍・魎は各種妖怪の総称。中国の古典由来',ex:'政界には魑魅魍魎が跋扈している。',syn:'妖怪・化け物・悪魔',ant:'清廉潔白・正人'},
+  {w:'ノスタルジア',r:'のすたるじあ',cat:'外来語',mean:'過去の懐かしい記憶への郷愁・望郷の念',ety:'ギリシャ語nostos=帰郷+algos=痛み。故郷への痛みある憧れ',ex:'あの曲を聞くとノスタルジアに浸る。',syn:'郷愁・懐かしさ・追憶',ant:'現実志向・前向き'},
+  {w:'プロビデンス',r:'ぷろびでんす',cat:'外来語',mean:'神意・天命・摂理',ety:'ラテン語providentia=先見。神が世界を導く意思',ex:'プロビデンスに従い次の道を歩む。',syn:'天命・摂理・宿命',ant:'偶然・無秩序'},
+  {w:'含蓄',r:'がんちく',cat:'漢語',mean:'言葉や表現の奥に深い意味が含まれていること',ety:'含=含む+蓄=蓄える。中国語由来',ex:'先生の一言には深い含蓄があった。',syn:'深み・奥深さ・示唆',ant:'軽薄・浅さ・表面的'},
+  {w:'邂逅',r:'かいこう',cat:'漢語',mean:'思いがけない出会い・偶然の再会',ety:'邂=偶然出会う+逅=遭う。期せずして出会うこと',ex:'20年ぶりの邂逅に二人は言葉を失った。',syn:'再会・めぐりあい・出会い',ant:'別れ・離別・決別'},
+  {w:'煌めき',r:'きらめき',cat:'和語',mean:'光が瞬間的に強く輝くさま。才能や希望が輝くさま',ety:'「きらきら」の動詞形「きらめく」の名詞化',ex:'才能の煌めきを秘めた若き演奏家だ。',syn:'輝き・閃き・光輝',ant:'陰り・翳り・くすみ'},
+  {w:'慟哭',r:'どうこく',cat:'漢語',mean:'声をあげて激しく泣くこと',ety:'慟=激しく悲しむ+哭=泣き叫ぶ。激情的な悲嘆',ex:'訃報を聞いた彼は慟哭した。',syn:'号泣・嗚咽・啜り泣き',ant:'歓喜・爆笑・喝采'},
+  {w:'眩暈',r:'めまい',cat:'和語',mean:'目がくらんでふらつく感覚。また複雑さに圧倒されること',ety:'「目（め）」+「回る（まわり）」が変化した複合語',ex:'情報の多さに眩暈を覚えた。',syn:'めくるめく・目が回る・錯覚',ant:'明晰・鮮明・安定'},
+  {w:'カタルシス',r:'かたるしす',cat:'外来語',mean:'感情の浄化・精神的解放感。映画・音楽などで感情が解放されること',ety:'ギリシャ語katharsis=浄化。アリストテレスの詩学',ex:'映画のラストシーンはカタルシスをもたらした。',syn:'浄化・解放感・昇華',ant:'抑圧・閉塞感・感情の停滞'},
+  {w:'蟄居',r:'ちっきょ',cat:'漢語',mean:'家にこもって外出しないこと。昔の武士の謹慎刑',ety:'蟄=虫が冬ごもりする+居=いる。虫の冬眠のように閉じこもる',ex:'コロナ禍の蟄居生活が読書量を増やした。',syn:'閉居・謹慎・引きこもり',ant:'活動・外出・解放'},
+  {w:'俯瞰',r:'ふかん',cat:'漢語',mean:'高い所から見下ろすこと。全体を広い視野で見ること',ety:'俯=うつむく+瞰=見る。高所から下を見るイメージ',ex:'プロジェクトを俯瞰して問題を発見した。',syn:'鳥瞰・全体像・大局観',ant:'局所・木を見て森を見ず'},
+  {w:'逆説',r:'ぎゃくせつ',cat:'漢語',mean:'常識に反するようで実は真実を突いた表現・矛盾を含む真理',ety:'逆=反対+説=言説。パラドックスの訳語',ex:'「急がば回れ」は逆説的な知恵だ。',syn:'パラドックス・矛盾・逆理',ant:'直説・常識・自明の理'},
+  {w:'脆弱',r:'ぜいじゃく',cat:'漢語',mean:'もろくて弱いこと。強い衝撃に耐えられないさま',ety:'脆=もろい+弱=よわい。強度が低いイメージ',ex:'システムの脆弱性を突いたサイバー攻撃だ。',syn:'もろさ・弱さ・欠点',ant:'強靭・堅牢・頑丈'},
+  {w:'玄妙',r:'げんみょう',cat:'漢語',mean:'奥深くて不思議なこと。言葉では説明できない深遠さ',ety:'玄=奥深い+妙=不思議。老子の「玄之又玄」に由来',ex:'この曲の玄妙な美しさは言葉にならない。',syn:'神秘・幽玄・奥深い',ant:'単純・明白・表面的'},
+  {w:'幽玄',r:'ゆうげん',cat:'漢語',mean:'奥深く神秘的な情趣。日本の美意識のひとつ',ety:'幽=かすかで奥深い+玄=深くて暗い。能・和歌の美的概念',ex:'能の舞台に漂う幽玄の世界に引き込まれた。',syn:'奥深さ・侘び・神秘',ant:'露骨・あからさま・俗っぽい'},
+  {w:'エフェメラル',r:'えふぇめらる',cat:'外来語',mean:'つかの間の・はかない・短命な',ety:'ギリシャ語ephemeros=一日限りの。クラウドの一時リソースにも使われる',ex:'桜の美しさはエフェメラルだからこそ愛おしい。',syn:'はかない・一瞬・短命',ant:'永続・不朽・恒久'},
+  {w:'パラダイム',r:'ぱらだいむ',cat:'外来語',mean:'時代の支配的な思想的枠組み・物事の見方の型',ety:'ギリシャ語paradeigma=模範・例。トーマス・クーンが科学哲学で普及',ex:'スマホの登場はコミュニケーションのパラダイムを変えた。',syn:'枠組み・世界観・モデル',ant:'例外・逸脱・変革'},
+  {w:'懐古',r:'かいこ',cat:'漢語',mean:'過ぎ去った昔を懐かしく思うこと',ety:'懐=いだく+古=古い。昔を心の中に抱くイメージ',ex:'懐古の念に浸りながら故郷を訪れた。',syn:'郷愁・追憶・回顧',ant:'未来志向・前進・断捨離'},
+  {w:'梢',r:'こずえ',cat:'和語',mean:'木の幹の先端部分・枝の先',ety:'木（こ）の末（すえ）が変化。古語では「こずゑ」',ex:'梢を揺らす風に秋の訪れを感じた。',syn:'枝先・木立・枝末',ant:'根・幹・土台'},
+  {w:'余白',r:'よはく',cat:'漢語',mean:'書かれていない空間・ゆとり・伝わらない部分の美',ety:'余=余る+白=白いまま。余った白い空間',ex:'余白のある話し方が想像力を引き出す。',syn:'空白・余地・間（ま）',ant:'埋め尽くし・過密・説明過多'},
+  {w:'うねり',r:'うねり',cat:'和語',mean:'波や地形・気運などが大きくゆっくりと起伏する様子',ety:'「うねる」の名詞形。曲がりくねって動くさま',ex:'時代のうねりに乗れる者が生き残る。',syn:'波動・動勢・潮流',ant:'静止・停滞・凪'},
+  {w:'旺盛',r:'おうせい',cat:'漢語',mean:'勢いが盛んで活発なこと・意欲が満ちあふれていること',ety:'旺=盛んに輝く+盛=さかんである',ex:'旺盛な好奇心が彼の原動力だ。',syn:'活発・旺んな・エネルギッシュ',ant:'衰退・消極的・沈滞'},
+  {w:'遡及',r:'そきゅう',cat:'漢語',mean:'過去に遡って効力を持たせること',ety:'遡=さかのぼる+及=及ぶ。過去に向かって力が届く',ex:'改正法の遡及適用は原則禁止だ。',syn:'さかのぼる・遡行・後及',ant:'将来効・前進・未来適用'},
+];
+
+let currentWordIdx = null;
+let favorites = JSON.parse(localStorage.getItem('word-favorites') || '[]');
+let checkedDays = JSON.parse(localStorage.getItem('word-streak-days') || '[]');
+let streak = parseInt(localStorage.getItem('word-streak') || '0');
+let maxStreak = parseInt(localStorage.getItem('word-max-streak') || '0');
+
+function getTodayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function getTodayIndex() {
+  const start = new Date('2024-01-01');
+  const now = new Date();
+  const diff = Math.floor((now - start) / 86400000);
+  return diff % WORDS.length;
+}
+
+function showWord(idx) {
+  currentWordIdx = idx;
+  const w = WORDS[idx];
+
+  const wEl = document.getElementById('word-display');
+  wEl.className = 'text-5xl font-bold text-white mb-2';
+  void wEl.offsetWidth;
+  wEl.className = 'text-5xl font-bold text-white mb-2 spin-in';
+  wEl.textContent = w.w;
+
+  document.getElementById('reading-display').textContent = '読み: ' + w.r;
+  document.getElementById('meaning-display').textContent = w.mean;
+  document.getElementById('etymology-display').textContent = w.ety;
+  document.getElementById('example-display').textContent = w.ex;
+  document.getElementById('syn-display').textContent = w.syn;
+  document.getElementById('ant-display').textContent = w.ant;
+  document.getElementById('word-type-badge').textContent = w.cat;
+
+  const isFav = favorites.includes(idx);
+  document.getElementById('fav-btn').textContent = isFav ? '❤️' : '🤍';
+}
+
+function showTodayWord() {
+  showWord(getTodayIndex());
+}
+
+function showRandomWord() {
+  let idx;
+  do { idx = Math.floor(Math.random() * WORDS.length); } while (idx === currentWordIdx);
+  showWord(idx);
+}
+
+function toggleFavorite() {
+  if (currentWordIdx === null) return;
+  const idx = favorites.indexOf(currentWordIdx);
+  const btn = document.getElementById('fav-btn');
+  if (idx >= 0) {
+    favorites.splice(idx, 1);
+    btn.textContent = '🤍';
+  } else {
+    favorites.push(currentWordIdx);
+    btn.textContent = '❤️';
+    btn.classList.add('heart-beat');
+    setTimeout(() => btn.classList.remove('heart-beat'), 400);
+  }
+  localStorage.setItem('word-favorites', JSON.stringify(favorites));
+  renderFavorites();
+}
+
+function renderFavorites() {
+  const list = document.getElementById('fav-list');
+  const empty = document.getElementById('fav-empty');
+  const count = document.getElementById('fav-count');
+  list.innerHTML = '';
+  count.textContent = favorites.length;
+
+  if (favorites.length === 0) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  favorites.forEach(idx => {
+    const w = WORDS[idx];
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-700 rounded px-2';
+    row.setAttribute('role', 'button');
+    row.setAttribute('aria-label', w.w + 'を表示');
+    const word = document.createElement('span');
+    word.className = 'font-bold text-blue-300';
+    word.textContent = w.w;
+    const reading = document.createElement('span');
+    reading.className = 'text-xs text-gray-400';
+    reading.textContent = w.r;
+    const mean = document.createElement('span');
+    mean.className = 'text-xs text-gray-300 flex-1 truncate';
+    mean.textContent = w.mean;
+    row.appendChild(word); row.appendChild(reading); row.appendChild(mean);
+    row.onclick = () => showWord(idx);
+    list.appendChild(row);
+  });
+}
+
+function markToday() {
+  const today = getTodayStr();
+  const msg = document.getElementById('streak-msg');
+  if (checkedDays.includes(today)) {
+    msg.textContent = '今日はすでに確認済みです！';
+    return;
+  }
+  // Check if yesterday was also checked
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yd = yesterday.getFullYear() + '-' + String(yesterday.getMonth()+1).padStart(2,'0') + '-' + String(yesterday.getDate()).padStart(2,'0');
+  if (checkedDays.includes(yd)) {
+    streak++;
+  } else if (checkedDays.length === 0) {
+    streak = 1;
+  } else {
+    streak = 1;
+  }
+  maxStreak = Math.max(maxStreak, streak);
+  checkedDays.push(today);
+  localStorage.setItem('word-streak-days', JSON.stringify(checkedDays));
+  localStorage.setItem('word-streak', String(streak));
+  localStorage.setItem('word-max-streak', String(maxStreak));
+  msg.textContent = streak >= 30 ? '🎉 30日チャレンジ達成！' : '継続中！次のチェックも忘れずに 💪';
+  renderStreak();
+}
+
+function renderStreak() {
+  document.getElementById('streak-count').textContent = streak;
+  document.getElementById('streak-max').textContent = '最大 ' + maxStreak + ' 日';
+
+  // Calendar
+  const cal = document.getElementById('streak-calendar');
+  cal.innerHTML = '';
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const dayNames = ['日','月','火','水','木','金','土'];
+  dayNames.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'text-center text-xs text-gray-500';
+    el.textContent = d;
+    cal.appendChild(el);
+  });
+  const firstDow = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstDow; i++) {
+    const el = document.createElement('div'); cal.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const el = document.createElement('div');
+    el.className = 'text-center text-xs rounded ' + (checkedDays.includes(dateStr)
+      ? 'bg-green-600 text-white font-bold'
+      : (d === now.getDate() ? 'bg-gray-600 text-white' : 'text-gray-500'));
+    el.textContent = d;
+    cal.appendChild(el);
+  }
+}
+
+function renderCatStats() {
+  const stats = {};
+  WORDS.forEach(w => { stats[w.cat] = (stats[w.cat] || 0) + 1; });
+  const container = document.getElementById('cat-stats');
+  container.innerHTML = '';
+  Object.entries(stats).forEach(([cat, count]) => {
+    const row = document.createElement('div');
+    row.className = 'flex justify-between text-gray-400';
+    const k = document.createElement('span'); k.textContent = cat;
+    const v = document.createElement('span'); v.className = 'font-mono'; v.textContent = count + '語';
+    row.appendChild(k); row.appendChild(v);
+    container.appendChild(row);
+  });
+}
+
+showTodayWord();
+renderFavorites();
+renderStreak();
+renderCatStats();
+</script>
+</body>
+</html>
